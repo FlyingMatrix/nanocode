@@ -20,7 +20,6 @@ BLUE, CYAN, GREEN, YELLOW, RED = (
 )
 
 # ------ tool function implementations ------
-
 # read file with line numbers
 def read(args):
     lines = open(args["path"]).readlines()
@@ -63,21 +62,92 @@ def glob(args):
 
 # search files for regular expression
 def grep(args):
-    pass
+    pattern = re.compile(args["pat"])
+    hits = []
+    for filepath in globlib.glob(args.get("path", ".") + "/**", recursive=True):    # list of file paths to search
+        try:
+            for line_num, line in enumerate(open(filepath), 1):
+                 if pattern.search(line):                                           # check if the line matches the regular expression
+                     hits.append(f"{filepath}:{line_num}:{line.rstrip()}")
+        except Exception:
+            pass
+    return "\n".join(hits[:50]) or "none"
 
 # run shell command
 def bash(args):
-    pass
+    proc = subprocess.Popen(        # start a new subprocess
+        args=args["cmd"],           # command to run
+        shell=True,                 # run command through shell
+        stdout=subprocess.PIPE,     # send the output of command into a pipe that Python can read
+        stderr=subprocess.STDOUT,   # merge stderr into stdout
+        text=True                   # output is returned as strings instead of bytes
+    )
+    output_lines = [] 
+    try:
+        while True:
+            line = proc.stdout.readline()               # read one line of output from the command as it runs
+            if not line and proc.poll() is not None:    # if no line was read and the process has finished -> exit the loop
+                break
+            if line: 
+                print(f" {DIM}| {line.rstrip()}{RESET}", flush=True) 
+                output_lines.append(line) 
+        proc.wait(timeout=30)
+    except subprocess.TimeoutExpired: 
+        proc.kill() 
+        output_lines.append("\n(timed out after 30s)")
+    return "".join(output_lines).strip() or "(empty)"
 
 # ------ tool definitions ------
-TOOLS = {}
+"""
+    TOOLS is a registry of tools with metadata and the actual callable function with a sturcture as below:
 
+        TOOLS = {
+            "tool_name": (description, parameters, function),
+            ...
+        }
+
+        - each key is a tool name
+        - each value is a tuple containing:
+            > description (string)
+            > mandatory and optional parameters
+            > actual callable function
+"""
+TOOLS = {
+    "read": (
+        "Read file with line numbers (file path, not directory)",
+        {"path": "string", "offset": "number?", "limit": "number?"},
+        read,
+    ),
+    "write": (
+        "Write content to file",
+        {"path": "string", "content": "string"},
+        write,
+    ),
+    "edit": (
+        "Replace old with new in file (old must be unique unless all=true)",
+        {"path": "string", "old": "string", "new": "string", "all": "boolean?"},
+        edit,
+    ),
+    "glob": (
+        "Find files by pattern, sorted by last modified time",
+        {"pat": "string", "path": "string?"},
+        glob,
+    ),
+    "grep": (
+        "Search files for regular expression pattern",
+        {"pat": "string", "path": "string?"},
+        grep,
+    ),
+    "bash": (
+        "Run shell command",
+        {"cmd": "string"},
+        bash,
+    ),
+}
 
 def main():
     model ="qwen3:8b"
     print(f"{BOLD}{CYAN}nanocode{RESET} | {BOLD}{YELLOW}Ollama::{model}{RESET} | {BOLD}{GREEN}{os.getcwd()}{RESET}\n")
-
-
 
 if __name__ == "__main__":
     main()
