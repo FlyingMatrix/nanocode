@@ -38,11 +38,28 @@ def write(args):
 
 # replace string in file
 def edit(args):
-    pass
+    text = open(args["path"]).read()
+    old, new = args["old"], args["new"]
+    if old not in text:
+        return "error: old_string not found"
+    count = text.count(old)
+    if not args.get("all") and count > 1:
+        return f"error: old_string appears {count} times, must be unique (use all=true)"
+    replacement = text.replace(old, new) if args.get("all") else text.replace(old, new, 1)
+    with open(args["path"], "w") as f:
+        f.write(replacement)
+    return "ok"
 
-# find files by pattern
+# find files by pattern and sort from newest to oldest
 def glob(args):
-    pass
+    pattern = (args.get("path", ".") + "/" + args["pat"]).replace("//", "/")
+    files = globlib.glob(pattern, recursive=True)
+    files = sorted(
+        files,
+        key=lambda f: os.path.getmtime(f) if os.path.isfile(f) else 0,
+        reverse=True,   # newest files first
+    )                   # files is a list of files sorted from newest to oldest
+    return "\n".join(files) or "none"
 
 # search files for regular expression
 def grep(args):
