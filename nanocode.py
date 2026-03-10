@@ -177,7 +177,31 @@ def make_schema():  # convert a simple internal TOOLS dictionary into a JSON sch
         )
     return result  
 
+def call_ollama(model, messages, system_prompt):
+    full_messages = [{"role": "system", "content": system_prompt}] + messages
+    response = ollama.chat(
+        model=model,
+        messages=full_messages,
+        options={
+            "temperature": 0.2,
+            "num_predict": 8192
+        }
+    )
 
+    # update messages
+    content = response["message"]["content"]
+    messages.append({
+        "role": "assistant",
+        "content": content
+    })
+
+    return response     # return entire response object
+
+def separator():
+    pass
+
+def render_markdown(text):
+    pass
 
 def main():
     model ="qwen3:8b"
