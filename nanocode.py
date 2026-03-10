@@ -145,6 +145,40 @@ TOOLS = {
     ),
 }
 
+def run_tool(name, args):
+    try:
+        return TOOLS[name][2](args)
+    except Exception as err:
+        return f"error: {err}"
+    
+def make_schema():  # convert a simple internal TOOLS dictionary into a JSON schema specification for tool inputs
+    result = []
+    for name, (description, params, function) in TOOLS.items():
+        properties = {}
+        required = []
+        for param_name, param_type in params.items():
+            is_optional = param_type.endswith("?")
+            base_type = param_type.rstrip("?")
+            properties[param_name] = {
+                "type": "integer" if base_type == "number" else base_type
+            }
+            if not is_optional:
+                required.append(param_name)
+    result.append(
+            {
+                "name": name,
+                "description": description,
+                "input_schema": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            }
+        )
+    return result  
+
+
+
 def main():
     model ="qwen3:8b"
     print(f"{BOLD}{CYAN}nanocode{RESET} | {BOLD}{YELLOW}Ollama::{model}{RESET} | {BOLD}{GREEN}{os.getcwd()}{RESET}\n")
