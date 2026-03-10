@@ -187,21 +187,19 @@ def call_ollama(model, messages, system_prompt):
             "num_predict": 8192
         }
     )
-
     # update messages
     content = response["message"]["content"]
     messages.append({
         "role": "assistant",
         "content": content
     })
-
     return response     # return entire response object
 
 def separator():
-    pass
+    return f"{DIM}{'─' * min(os.get_terminal_size().columns, 80)}{RESET}"
 
-def render_markdown(text):
-    pass
+def render_markdown(text):  # convert markdown-style bold text (**text**) into terminal bold formatting using ANSI escape codes
+    return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
 
 def main():
     model ="qwen3:8b"
