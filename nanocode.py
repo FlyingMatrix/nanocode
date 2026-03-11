@@ -177,13 +177,14 @@ def make_schema():  # convert a simple internal TOOLS dictionary into a JSON sch
         )
     return result  
 
-def call_ollama(model, messages, system_prompt):
-    full_messages = [{"role": "system", "content": system_prompt}] + messages
+def call_model(model, messages, system_prompt):
     response = ollama.chat(
-        model=model,
-        messages=full_messages,
+        model= model,
+        messages=(
+            [{"role": "system", "content": system_prompt}] if system_prompt else []
+        ) + messages,
+        tools=make_schema(),
         options={
-            "temperature": 0.2,
             "num_predict": 8192
         }
     )
@@ -193,7 +194,7 @@ def call_ollama(model, messages, system_prompt):
         "role": "assistant",
         "content": content
     })
-    return response     # return entire response object
+    return response     # here, response is a dict
 
 def separator():
     return f"{DIM}{'─' * min(os.get_terminal_size().columns, 80)}{RESET}"
@@ -204,6 +205,40 @@ def render_markdown(text):  # convert markdown-style bold text (**text**) into t
 def main():
     model ="qwen3:8b"
     print(f"{BOLD}{CYAN}nanocode{RESET} | {BOLD}{YELLOW}Ollama::{model}{RESET} | {BOLD}{GREEN}{os.getcwd()}{RESET}\n")
+    messages = []
+    try:
+        cwd = os.getcwd()
+    except Exception as e:
+        cwd = "<unknown directory>"
+        print(f"Warning: failed to get cwd: {e}")
+    system_prompt = f"Concise coding assistant. cwd: {cwd}"
+
+    while True:
+        try:
+            print(separator())
+            user_input = input(f"{BOLD}{BLUE}❯❯{RESET} ").strip()
+            print(separator())
+            if not user_input:
+                continue
+            if user_input in ("/q", "exit"):
+                break
+            if user_input == "/c":
+                messages = []
+                print(f"{GREEN}⏺ Cleared conversation{RESET}")
+                continue
+            
+            messages.append({"role": "user", "content": user_input})
+
+            # agentic loop
+            while True:
+                response = call_model(model, messages, system_prompt)
+                
+
+
+        except (KeyboardInterrupt, EOFError):
+            break
+        except Exception as err:
+            print(f"{RED}⏺ Error: {err}{RESET}") 
 
 if __name__ == "__main__":
     main()
