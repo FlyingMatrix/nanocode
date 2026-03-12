@@ -2,14 +2,17 @@
 """
     A lightweight CLI-based coding assistant for reading, editing, and automating tasks with LLMs
 """
-import glob as globlib  # used for finding files and directories matching a pattern
-import json             # for parsing and generating json data
-import os               # providing operating system utilities
-import re               # regular expressions for pattern matching in strings
-import subprocess       # for running shell commands or external programs
+import glob as globlib      # used for finding files and directories matching a pattern
+import json                 # for parsing and generating json data
+import os                   # providing operating system utilities
+import re                   # regular expressions for pattern matching in strings
+import subprocess           # for running shell commands or external programs
 import ollama
 
 # ------ ANSI styles and colors ------
+from colorama import init   # for Windows / Anaconda
+init()                      # enables ANSI support on Windows
+
 RESET, BOLD, DIM = "\033[0m", "\033[1m", "\033[2m"
 BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[34m",
@@ -224,7 +227,7 @@ def main():
                 break
             if user_input == "/c":
                 messages = []
-                print(f"{GREEN}⏺ Cleared conversation{RESET}")
+                print(f"{GREEN}❯❯ Cleared conversation{RESET}")
                 continue
             
             messages.append({"role": "user", "content": user_input})
@@ -232,13 +235,13 @@ def main():
             # agentic loop
             while True:
                 response = call_model(model, messages, system_prompt)
-                
+
 
 
         except (KeyboardInterrupt, EOFError):
             break
         except Exception as err:
-            print(f"{RED}⏺ Error: {err}{RESET}") 
+            print(f"{RED}❯❯ Error: {err}{RESET}") 
 
 if __name__ == "__main__":
     main()
