@@ -235,6 +235,16 @@ def main():
             # agentic loop
             while True:
                 response = call_model(model, messages, system_prompt)
+                if isinstance(response.get("content"), str):
+                    content_blocks = [
+                            {
+                                "type": "text",
+                                "text": response["content"]
+                            }
+                        ]
+                tool_results = []
+
+                
 
 
 
