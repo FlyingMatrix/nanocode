@@ -197,7 +197,39 @@ def call_model(model, messages, system_prompt):
         "role": "assistant",
         "content": content
     })
-    return response     # here, response is a dict
+    return response
+    """
+        typical ollama.chat() response structure:
+
+        {
+            "model": "model-name",
+            "created_at": "2026-03-14T12:34:56.789Z",
+            "message": {
+                "role": "assistant",
+                "content": "The model's generated text response",
+                "tool_calls": [
+                    {
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "tool_name",
+                            "arguments": {
+                                "arg1": "value1"
+                            }
+                        }
+                    }
+                ]
+            },
+            "done": True,
+            "done_reason": "stop",
+            "total_duration": 123456789,
+            "load_duration": 123456,
+            "prompt_eval_count": 123,
+            "prompt_eval_duration": 456789,
+            "eval_count": 456,
+            "eval_duration": 987654321
+        }
+    """
 
 def separator():
     return f"{DIM}{'─' * min(os.get_terminal_size().columns, 80)}{RESET}"
@@ -235,16 +267,11 @@ def main():
             # agentic loop
             while True:
                 response = call_model(model, messages, system_prompt)
-                if isinstance(response.get("content"), str):
-                    content_blocks = [
-                            {
-                                "type": "text",
-                                "text": response["content"]
-                            }
-                        ]
+                message_blocks = response.get("message", {})
                 tool_results = []
 
-                
+                for message in message_blocks:
+                    pass
 
 
 
