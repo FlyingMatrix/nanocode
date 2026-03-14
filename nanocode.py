@@ -271,7 +271,17 @@ def main():
                 tool_results = []
 
                 for message in message_blocks:
-                    pass
+                    if message.get("content"):
+                        print(f"\n{CYAN}❯❯ {RESET} {render_markdown(message['content'])}")
+
+                    if message.get("tool_calls"):
+                        tool_calls = response["message"].get("tool_calls", [])
+                        for tool in tool_calls:
+                            tool_name = tool["function"]["name"]
+                            tool_args = tool["function"]["arguments"]
+                    
+                    
+
 
 
 
