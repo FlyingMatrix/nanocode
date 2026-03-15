@@ -279,9 +279,28 @@ def main():
                         for tool in tool_calls:
                             tool_name = tool["function"]["name"]
                             tool_args = tool["function"]["arguments"]
-                    
-                    
+                            arg_preview = str(list(tool_args.values())[0])[:50]
+                            print(f"\n{GREEN}❯❯ {tool_name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
 
+                            result = run_tool(tool_name, tool_args)
+                            result_lines = result.split("\n")
+                            preview = result_lines[0][:60]
+                            if len(result_lines) > 1:
+                                preview += f" ... +{len(result_lines) - 1} lines"
+                            elif len(result_lines[0]) > 60:
+                                preview += "..."
+                            print(f"  {DIM}❯❯  {preview}{RESET}")
+
+                            tool_results.append(
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": tool["id"],
+                                    "content": result,
+                                }
+                            )
+                
+                messages.append({"role": "assistant", "content": message_blocks})
+                
 
 
 
