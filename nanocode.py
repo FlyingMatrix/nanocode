@@ -301,13 +301,17 @@ def main():
                 
                 messages.append({"role": "assistant", "content": message_blocks})
                 
+                if not tool_results:
+                    break
+                messages.append({"role": "user", "content": tool_results})
 
-
+            print() # print out a blank line in the console
 
         except (KeyboardInterrupt, EOFError):
             break
         except Exception as err:
             print(f"{RED}❯❯ Error: {err}{RESET}") 
+
 
 if __name__ == "__main__":
     main()
