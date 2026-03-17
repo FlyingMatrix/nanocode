@@ -294,7 +294,6 @@ def main():
         cwd = "<unknown directory>"
         print(f"Warning: failed to get cwd: {e}")
 
-    # system_prompt = f"Concise coding assistant. cwd: {cwd}"
     system_prompt = f"""
         You are an autonomous coding agent working inside a local repository.
 
@@ -315,7 +314,7 @@ def main():
         Behavior rules:
         1. Use tools to explore the repository before answering when needed.
         2. Prefer reading source code over relying only on README or assumptions.
-        3. For exploratory questions (e.g., "what does this repo do"), inspect multiple relevant files.
+        3. For exploratory questions, inspect multiple relevant files.
         4. Think step-by-step and make multiple tool calls if necessary.
         5. Avoid repeating identical tool calls with the same arguments.
         6. Stop using tools once you have enough information.
@@ -329,7 +328,7 @@ def main():
         - If more information is needed, call tools.
         - If sufficient information is gathered, provide a clear and concise final answer.
         - Be concise but thorough.
-        """
+    """
 
     while True:
         try:
@@ -375,7 +374,8 @@ def main():
                     print(f"\n{GREEN}❯❯ {tool_name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
 
                     result = run_tool(tool_name, tool_args)
-                    print(f"{GREEN}❯❯ {RESET}{DIM}{result}{RESET}")
+                    for line in str(result).splitlines():
+                        print(f"{GREEN}❯❯ {RESET}{DIM}{line}{RESET}")
 
                     messages.append({
                         "role": "tool",
