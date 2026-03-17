@@ -24,80 +24,117 @@ BLUE, CYAN, GREEN, YELLOW, RED = (
 
 # ------ tool function implementations ------
 # read file with line numbers
-def read(args):
-    lines = open(args["path"]).readlines()
-    offset = args.get("offset", 0)
-    limit = args.get("limit", len(lines))
-    selected_lines = lines[offset: offset+limit]
-    read_lines = "".join(f"{offset+idx+1:4}| {line}" for idx, line in enumerate(selected_lines))
-    return read_lines
+def read(path, offset=0, limit=None):
+    lines = open(path).readlines()
+
+    if limit is None:
+        limit = len(lines)
+
+    selected_lines = lines[offset: offset + limit]
+
+    read_lines = "".join(
+        f"{offset + idx + 1:4}| {line}"
+        for idx, line in enumerate(selected_lines)
+    )
+
+    return read_lines if read_lines else "(empty file)"
 
 # write content to file
-def write(args):
-    with open(args["path"], "w") as f:
-        f.write(args["content"])
+def write(path, content):
+    with open(path, "w") as f:
+        f.write(content)
     return "ok"
 
 # replace string in file
-def edit(args):
-    text = open(args["path"]).read()
-    old, new = args["old"], args["new"]
+def edit(path, old, new, all=False):
+    with open(path) as f:
+        text = f.read()
+
     if old not in text:
         return "error: old_string not found"
+
     count = text.count(old)
-    if not args.get("all") and count > 1:
+
+    if not all and count > 1:
         return f"error: old_string appears {count} times, must be unique (use all=true)"
-    replacement = text.replace(old, new) if args.get("all") else text.replace(old, new, 1)
-    with open(args["path"], "w") as f:
+
+    if all:
+        replacement = text.replace(old, new)
+    else:
+        replacement = text.replace(old, new, 1)
+
+    with open(path, "w") as f:
         f.write(replacement)
+
     return "ok"
 
 # find files by pattern and sort from newest to oldest
-def glob(args):
-    pattern = (args.get("path", ".") + "/" + args["pat"]).replace("//", "/")
+def glob(pat, path=None):
+    base = path or "."
+    pattern = os.path.join(base, pat)
+
     files = globlib.glob(pattern, recursive=True)
+
     files = sorted(
         files,
         key=lambda f: os.path.getmtime(f) if os.path.isfile(f) else 0,
-        reverse=True,   # newest files first
-    )                   # files is a list of files sorted from newest to oldest
-    return "\n".join(files) or "none"
+        reverse=True,
+    )
+
+    # convert to relative paths
+    cwd = os.getcwd()
+    rel_files = [os.path.relpath(f, cwd) for f in files]
+
+    return "\n".join(rel_files) if rel_files else "(no matches)"
 
 # search files for regular expression
-def grep(args):
-    pattern = re.compile(args["pat"])
+def grep(pat, path="."):
+    pattern = re.compile(pat)
     hits = []
-    for filepath in globlib.glob(args.get("path", ".") + "/**", recursive=True):    # list of file paths to search
+
+    for filepath in globlib.glob(os.path.join(path, "**"), recursive=True):
+        if not os.path.isfile(filepath):
+            continue
+
         try:
-            for line_num, line in enumerate(open(filepath), 1):
-                 if pattern.search(line):                                           # check if the line matches the regular expression
-                     hits.append(f"{filepath}:{line_num}:{line.rstrip()}")
+            with open(filepath, errors="ignore") as f:
+                for line_num, line in enumerate(f, 1):
+                    if pattern.search(line):
+                        hits.append(f"{filepath}:{line_num}:{line.rstrip()}")
+                        if len(hits) >= 50:
+                            return "\n".join(hits)
         except Exception:
             pass
-    return "\n".join(hits[:50]) or "none"
+
+    return "\n".join(hits) if hits else "(no matches)"
 
 # run shell command
-def bash(args):
-    proc = subprocess.Popen(        # start a new subprocess
-        args=args["cmd"],           # command to run
-        shell=True,                 # run command through shell
-        stdout=subprocess.PIPE,     # send the output of command into a pipe that Python can read
-        stderr=subprocess.STDOUT,   # merge stderr into stdout
-        text=True                   # output is returned as strings instead of bytes
+def bash(cmd):
+    proc = subprocess.Popen(
+        cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
     )
-    output_lines = [] 
+
+    output_lines = []
+
     try:
         while True:
-            line = proc.stdout.readline()               # read one line of output from the command as it runs
-            if not line and proc.poll() is not None:    # if no line was read and the process has finished -> exit the loop
+            line = proc.stdout.readline()
+            if not line and proc.poll() is not None:
                 break
-            if line: 
-                print(f" {DIM}| {line.rstrip()}{RESET}", flush=True) 
-                output_lines.append(line) 
+            if line:
+                print(f" {DIM}| {line.rstrip()}{RESET}", flush=True)
+                output_lines.append(line)
+
         proc.wait(timeout=30)
-    except subprocess.TimeoutExpired: 
-        proc.kill() 
+
+    except subprocess.TimeoutExpired:
+        proc.kill()
         output_lines.append("\n(timed out after 30s)")
+
     return "".join(output_lines).strip() or "(empty)"
 
 # ------ tool definitions ------
@@ -150,35 +187,48 @@ TOOLS = {
 
 def run_tool(name, args):
     try:
-        return TOOLS[name][2](args)
+        func = TOOLS[name][2]
+        result = func(**args)
+
+        if result is None:
+            return "(no output)"
+
+        return str(result)
     except Exception as err:
         return f"error: {err}"
     
-def make_schema():  # convert a simple internal TOOLS dictionary into a JSON schema specification for tool inputs
+def make_schema(): 
     result = []
+
     for name, (description, params, function) in TOOLS.items():
         properties = {}
         required = []
+
         for param_name, param_type in params.items():
             is_optional = param_type.endswith("?")
             base_type = param_type.rstrip("?")
+
             properties[param_name] = {
-                "type": "integer" if base_type == "number" else base_type
+                "type": base_type 
             }
+
             if not is_optional:
                 required.append(param_name)
-    result.append(
-            {
+
+        result.append({
+            "type": "function",  
+            "function": {
                 "name": name,
                 "description": description,
-                "input_schema": {
+                "parameters": {  
                     "type": "object",
                     "properties": properties,
                     "required": required,
                 },
-            }
-        )
-    return result  
+            },
+        })
+
+    return result 
 
 def call_model(model, messages, system_prompt):
     response = ollama.chat(
@@ -199,36 +249,33 @@ def call_model(model, messages, system_prompt):
     })
     return response
     """
-        typical ollama.chat() response structure:
-
-        {
-            "model": "model-name",
-            "created_at": "2026-03-14T12:34:56.789Z",
-            "message": {
-                "role": "assistant",
-                "content": "The model's generated text response",
-                "tool_calls": [
-                    {
-                        "id": "call_123",
-                        "type": "function",
-                        "function": {
-                            "name": "tool_name",
-                            "arguments": {
-                                "arg1": "value1"
-                            }
-                        }
+    Typical ollama.chat() response (non-streaming, may vary by version/config):
+    {
+        "model": "model-name",
+        "created_at": "...",
+        "message": {
+            "role": "assistant",
+            "content": "...",
+            # Optional, only if tools are used:
+            "tool_calls": [
+                {
+                    "id": "...",
+                    "type": "function",
+                    "function": {
+                        "name": "...",
+                        "arguments": {...}  # sometimes a JSON string
                     }
-                ]
-            },
-            "done": True,
-            "done_reason": "stop",
-            "total_duration": 123456789,
-            "load_duration": 123456,
-            "prompt_eval_count": 123,
-            "prompt_eval_duration": 456789,
-            "eval_count": 456,
-            "eval_duration": 987654321
-        }
+                }
+            ]
+        },
+        "done": true,
+        "done_reason": "stop",
+        # Optional timing/debug fields:
+        "total_duration": ...,
+        "load_duration": ...,
+        "prompt_eval_count": ...,
+        "eval_count": ...
+    }
     """
 
 def separator():
@@ -239,14 +286,50 @@ def render_markdown(text):  # convert markdown-style bold text (**text**) into t
 
 def main():
     model ="qwen3:8b"
-    print(f"{BOLD}{CYAN}nanocode{RESET} | {BOLD}{YELLOW}Ollama::{model}{RESET} | {BOLD}{GREEN}{os.getcwd()}{RESET}\n")
+    print(f"{BOLD}{CYAN}nanocode{RESET} | {BOLD}{YELLOW}Ollama::{model}{RESET} | {BOLD}{GREEN}{os.path.relpath(os.getcwd())}{RESET}\n")
     messages = []
     try:
         cwd = os.getcwd()
     except Exception as e:
         cwd = "<unknown directory>"
         print(f"Warning: failed to get cwd: {e}")
-    system_prompt = f"Concise coding assistant. cwd: {cwd}"
+
+    # system_prompt = f"Concise coding assistant. cwd: {cwd}"
+    system_prompt = f"""
+        You are an autonomous coding agent working inside a local repository.
+
+        Context:
+        - Current working directory: {cwd}
+
+        Your goals:
+        - Help the user understand, analyze, and modify the repository using available tools.
+
+        Available tools:
+        - glob: discover files and directory structure
+        - read: read file contents
+        - grep: search across files using patterns
+        - edit: modify existing files
+        - write: create or overwrite files
+        - bash: execute shell commands
+
+        Behavior rules:
+        1. Use tools to explore the repository before answering when needed.
+        2. Prefer reading source code over relying only on README or assumptions.
+        3. For exploratory questions (e.g., "what does this repo do"), inspect multiple relevant files.
+        4. Think step-by-step and make multiple tool calls if necessary.
+        5. Avoid repeating identical tool calls with the same arguments.
+        6. Stop using tools once you have enough information.
+
+        Strategy:
+        - Use glob to find relevant files (e.g., *.py)
+        - Use read to inspect important files
+        - Use grep to search for key functions or patterns
+
+        Output rules:
+        - If more information is needed, call tools.
+        - If sufficient information is gathered, provide a clear and concise final answer.
+        - Be concise but thorough.
+        """
 
     while True:
         try:
@@ -267,43 +350,38 @@ def main():
             # agentic loop
             while True:
                 response = call_model(model, messages, system_prompt)
-                message_blocks = response.get("message", {})
-                tool_results = []
+                message_block = response.get("message", {})
 
-                for message in message_blocks:
-                    if message.get("content"):
-                        print(f"\n{CYAN}❯❯ {RESET} {render_markdown(message['content'])}")
+                # print assistant message
+                if message_block.get("content"):
+                    print(f"\n{CYAN}❯❯ {RESET}{render_markdown(message_block['content'])}")
 
-                    if message.get("tool_calls"):
-                        tool_calls = response["message"].get("tool_calls", [])
-                        for tool in tool_calls:
-                            tool_name = tool["function"]["name"]
-                            tool_args = tool["function"]["arguments"]
-                            arg_preview = str(list(tool_args.values())[0])[:50]
-                            print(f"\n{GREEN}❯❯ {tool_name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
+                # append assistant message ONCE
+                messages.append({
+                    "role": "assistant",
+                    "content": message_block.get("content", "")
+                })
 
-                            result = run_tool(tool_name, tool_args)
-                            result_lines = result.split("\n")
-                            preview = result_lines[0][:60]
-                            if len(result_lines) > 1:
-                                preview += f" ... +{len(result_lines) - 1} lines"
-                            elif len(result_lines[0]) > 60:
-                                preview += "..."
-                            print(f"  {DIM}❯❯  {preview}{RESET}")
+                # handle tool calls
+                tool_calls = message_block.get("tool_calls")
+                if not tool_calls:
+                    break  
 
-                            tool_results.append(
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": tool["id"],
-                                    "content": result,
-                                }
-                            )
-                
-                messages.append({"role": "assistant", "content": message_blocks})
-                
-                if not tool_results:
-                    break
-                messages.append({"role": "user", "content": tool_results})
+                for tool in tool_calls:
+                    tool_name = tool["function"]["name"]
+                    tool_args = tool["function"]["arguments"]
+
+                    arg_preview = str(list(tool_args.values())[0])[:50] if tool_args else ""
+                    print(f"\n{GREEN}❯❯ {tool_name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
+
+                    result = run_tool(tool_name, tool_args)
+                    print(f"{GREEN}❯❯ {RESET}{DIM}{result}{RESET}")
+
+                    messages.append({
+                        "role": "tool",
+                        "name": tool_name,
+                        "content": str(result)
+                    })
 
             print() # print out a blank line in the console
 
