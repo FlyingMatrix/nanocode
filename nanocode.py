@@ -25,7 +25,8 @@ BLUE, CYAN, GREEN, YELLOW, RED = (
 # ------ tool function implementations ------
 # read file with line numbers
 def read(path, offset=0, limit=None):
-    lines = open(path).readlines()
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
 
     if limit is None:
         limit = len(lines)
@@ -232,7 +233,7 @@ def make_schema():
 
 def call_model(model, messages, system_prompt):
     response = ollama.chat(
-        model= model,
+        model=model,
         messages=(
             [{"role": "system", "content": system_prompt}] if system_prompt else []
         ) + messages,
@@ -279,7 +280,7 @@ def call_model(model, messages, system_prompt):
     """
 
 def separator():
-    return f"{DIM}{'─' * min(os.get_terminal_size().columns, 80)}{RESET}"
+    return f"{DIM}{'─' * min(os.get_terminal_size().columns, 100)}{RESET}"
 
 def render_markdown(text):  # convert markdown-style bold text (**text**) into terminal bold formatting using ANSI escape codes
     return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
@@ -320,7 +321,7 @@ def main():
         6. Stop using tools once you have enough information.
 
         Strategy:
-        - Use glob to find relevant files (e.g., *.py)
+        - Use glob to find relevant files
         - Use read to inspect important files
         - Use grep to search for key functions or patterns
 
@@ -355,7 +356,7 @@ def main():
                 if message_block.get("content"):
                     print(f"\n{CYAN}❯❯ {RESET}{render_markdown(message_block['content'])}")
 
-                # append assistant message ONCE
+                # append assistant message
                 messages.append({
                     "role": "assistant",
                     "content": message_block.get("content", "")
@@ -370,7 +371,17 @@ def main():
                     tool_name = tool["function"]["name"]
                     tool_args = tool["function"]["arguments"]
 
-                    arg_preview = str(list(tool_args.values())[0])[:50] if tool_args else ""
+                    if tool_args:
+                        val = list(tool_args.values())[0]
+
+                        # Convert absolute path -> relative path
+                        if isinstance(val, str) and os.path.isabs(val):
+                            val = os.path.relpath(val)
+
+                        arg_preview = str(val)[:50]
+                    else:
+                        arg_preview = ""
+
                     print(f"\n{GREEN}❯❯ {tool_name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
 
                     result = run_tool(tool_name, tool_args)
