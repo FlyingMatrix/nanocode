@@ -42,9 +42,9 @@ def read(path, offset=0, limit=None):
 
 # write content to file
 def write(path, content):
-    with open(path, "w") as f:
-        f.write(content)
-    return "ok"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content.replace("\\n", "\n"))
+    return "write successfully"
 
 # replace string in file
 def edit(path, old, new, all=False):
